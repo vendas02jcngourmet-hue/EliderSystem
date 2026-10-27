@@ -198,10 +198,10 @@ function showApp(){
 async function carregar(){
   setSync('Carregando…');
   const [p,v,b,a] = await Promise.all([
-    sb.from('produtos').select('*').order('nome'),
-    sb.from('vendas').select('*').order('data',{ascending:false}).limit(5000),
-    sb.from('boletos').select('*').order('vencimento'),
-    sb.from('ajustes').select('*').maybeSingle()
+    sb.from('esys_produtos').select('*').order('nome'),
+    sb.from('esys_vendas').select('*').order('data',{ascending:false}).limit(5000),
+    sb.from('esys_boletos').select('*').order('vencimento'),
+    sb.from('esys_ajustes').select('*').maybeSingle()
   ]);
   const err = p.error||v.error||b.error||a.error;
   if(err){ setSync('Erro ao carregar'); toast(msgErro(err)); return; }
@@ -212,7 +212,7 @@ async function carregar(){
 }
 function msgErro(e){
   const m=(e&&(e.message||e.error_description))||'';
-  if(/duplicate key|vendas_pedido_unico/i.test(m)) return 'Esse pedido já foi lançado para esse produto.';
+  if(/duplicate key|esys_vendas_pedido_unico/i.test(m)) return 'Esse pedido já foi lançado para esse produto.';
   if(/JWT|session|auth/i.test(m)) return 'Sua sessão expirou. Entre de novo.';
   if(/relation .* does not exist/i.test(m)) return 'Tabelas não encontradas. Rode o supabase/schema.sql no SQL Editor.';
   return 'Não foi possível salvar: '+m;
@@ -357,7 +357,7 @@ function formVenda(){
     <label>Frete / embalagem (R$)<input id="vOut" type="number" step="0.01" min="0" value="0"></label>
   </div><div class="calc" id="vCalc"></div>`,
   ()=>{ const p=S.produtos.find(x=>x.id===val('vProd')); const qtd=+val('vQtd'), preco=+val('vPre'), auto=val('vTax')==='';
-    return run(sb.from('vendas').insert({produto_id:p.id,produto:p.nome,data:val('vData'),pedido:val('vPed').trim()||null,qtd,preco,
+    return run(sb.from('esys_vendas').insert({produto_id:p.id,produto:p.nome,data:val('vData'),pedido:val('vPed').trim()||null,qtd,preco,
       taxa:auto?Math.round(taxaUnit(preco).total*qtd*100)/100:+val('vTax'),taxa_auto:auto,outros:+val('vOut')||0,custo_unit:+p.custo||0}),'Venda registrada e estoque atualizado'); },
   e=>{ const p=S.produtos.find(x=>x.id===val('vProd'));
     if(!e || e.target.id==='vProd') $('vPre').value=p.preco||'';
@@ -377,7 +377,7 @@ function formProd(id){
     <label>Em estoque<input id="pEst" type="number" value="${p.estoque}" required></label>
     <label>Avisar quando ficar em<input id="pMin" type="number" min="0" value="${p.minimo}"></label>
   </div>`, ()=>{ const row={nome:val('pNome').trim(),sku:val('pSku').trim()||null,custo:+val('pCus'),preco:+val('pPre'),estoque:+val('pEst'),minimo:+val('pMin')||0};
-    return run(id?sb.from('produtos').update(row).eq('id',id):sb.from('produtos').insert(row), id?'Produto atualizado':'Produto cadastrado'); });
+    return run(id?sb.from('esys_produtos').update(row).eq('id',id):sb.from('esys_produtos').insert(row), id?'Produto atualizado':'Produto cadastrado'); });
 }
 function formBol(){
   openForm(`<h3>Novo boleto</h3><div class="fields">
@@ -385,7 +385,7 @@ function formBol(){
     <label>Fornecedor<input id="bForn"></label>
     <label>Valor (R$)<input id="bVal" type="number" step="0.01" min="0" required></label>
     <label>Vencimento<input id="bVen" type="date" value="${today()}" required></label>
-  </div>`, ()=>run(sb.from('boletos').insert({descricao:val('bDesc').trim(),fornecedor:val('bForn').trim()||null,valor:+val('bVal'),vencimento:val('bVen')}),'Boleto cadastrado'));
+  </div>`, ()=>run(sb.from('esys_boletos').insert({descricao:val('bDesc').trim(),fornecedor:val('bForn').trim()||null,valor:+val('bVal'),vencimento:val('bVen')}),'Boleto cadastrado'));
 }
 
 // ---------- Eventos ----------
@@ -396,14 +396,14 @@ function bind(){
   m.querySelectorAll('[data-per]').forEach(b=>b.onclick=()=>{S.periodo=+b.dataset.per;render()});
   m.querySelectorAll('[data-fil]').forEach(b=>b.onclick=()=>{S.filtro=b.dataset.fil;render()});
   m.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>formProd(b.dataset.edit));
-  m.querySelectorAll('[data-pay]').forEach(b=>b.onclick=()=>{const x=S.boletos.find(y=>y.id===b.dataset.pay);run(sb.from('boletos').update({pago:!x.pago,pago_em:x.pago?null:today()}).eq('id',x.id),x.pago?'Boleto reaberto':'Boleto marcado como pago')});
+  m.querySelectorAll('[data-pay]').forEach(b=>b.onclick=()=>{const x=S.boletos.find(y=>y.id===b.dataset.pay);run(sb.from('esys_boletos').update({pago:!x.pago,pago_em:x.pago?null:today()}).eq('id',x.id),x.pago?'Boleto reaberto':'Boleto marcado como pago')});
   m.querySelectorAll('[data-del]').forEach(b=>{b.onclick=()=>{
-    if(b.dataset.armed){const [c,id]=b.dataset.del.split(':');run(sb.from(c).delete().eq('id',id),c==='vendas'?'Venda excluída e itens devolvidos ao estoque':'Excluído');}
+    if(b.dataset.armed){const [c,id]=b.dataset.del.split(':');run(sb.from('esys_'+c).delete().eq('id',id),c==='vendas'?'Venda excluída e itens devolvidos ao estoque':'Excluído');}
     else{b.dataset.armed=1;b.textContent='Confirmar?';b.style.color='var(--bad)';setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.textContent='Excluir';b.style.color=''}},3000);}
   }});
   const f=$('cfg');
   if(f){
-    const salvar=(fx,meio,ok)=>run(sb.from('ajustes').upsert({user_id:user.id,faixas:fx,meio_abaixo:meio,atualizado_em:new Date().toISOString()}),ok);
+    const salvar=(fx,meio,ok)=>run(sb.from('esys_ajustes').upsert({user_id:user.id,faixas:fx,meio_abaixo:meio,atualizado_em:new Date().toISOString()}),ok);
     f.onsubmit=e=>{e.preventDefault();salvar(faixas().map((x,i)=>({ate:x.ate,pct:+val('fp'+i)||0,fixo:+val('ff'+i)||0})),+val('cMeio')||0,'Taxas salvas')};
     $('cReset').onclick=()=>salvar(FAIXAS_PADRAO,9,'Taxas padrão restauradas');
   }

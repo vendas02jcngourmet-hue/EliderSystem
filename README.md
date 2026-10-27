@@ -20,7 +20,13 @@ O site é estático (HTML + JavaScript) e os dados ficam no **Supabase**.
 | R$ 200,00 a R$ 499,99 | 14% | R$ 26,00 |
 | Acima de R$ 500,00 | 14% | R$ 26,00 |
 
-## Instalação (uma vez só)
+## Situação atual
+
+- **Site:** https://vendas02jcngourmet-hue.github.io/EliderSystem/
+- **Banco:** projeto Supabase **jcn gourmet**, tabelas com prefixo `esys_` (`esys_produtos`, `esys_vendas`, `esys_boletos`, `esys_ajustes`), separadas das tabelas do outro sistema que já usa esse projeto.
+- **Acesso:** entre com um usuário do Supabase Auth desse projeto. Cada usuário só vê os próprios dados.
+
+## Instalação do zero (caso precise recriar em outro projeto)
 
 ### 1. Criar o banco no Supabase
 
