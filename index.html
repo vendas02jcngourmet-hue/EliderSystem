@@ -350,6 +350,8 @@ function openForm(html,onSubmit,onInput){
   dlg.showModal(); if(onInput) onInput();
 }
 const val=id=>$(id).value;
+function addDias(iso,n){ const d=new Date(iso+'T12:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+function parcelar(total,n){ const c=Math.round(total*100), base=Math.floor(c/n), resto=c-base*n; return Array.from({length:n},(_,i)=>(base+(i<resto?1:0))/100); }
 const num=id=>val(id)===''?null:+val(id);
 function formVenda(){
   if(!S.produtos.length){ toast('Cadastre um produto no Estoque antes de lançar vendas'); S.view='estoque'; render(); return; }
@@ -361,16 +363,53 @@ function formVenda(){
     <label>Preço unitário (R$)<input id="vPre" type="number" step="0.01" min="0" required></label>
     <label>Taxa Shopee (R$)<input id="vTax" type="number" step="0.01" min="0" placeholder="Automática pela faixa"></label>
     <label>Frete / embalagem (R$)<input id="vOut" type="number" step="0.01" min="0" value="0"></label>
-  </div><div class="calc" id="vCalc"></div>`,
-  ()=>{ const p=S.produtos.find(x=>x.id===val('vProd')); const qtd=+val('vQtd'), preco=+val('vPre'), auto=val('vTax')==='';
-    return run(sb.from('esys_vendas').insert({produto_id:p.id,produto:p.nome,data:val('vData'),pedido:val('vPed').trim()||null,qtd,preco,
-      taxa:auto?Math.round(taxaUnit(preco).total*qtd*100)/100:+val('vTax'),taxa_auto:auto,outros:+val('vOut')||0,custo_unit:+p.custo||0}),'Venda registrada e estoque atualizado'); },
+  </div><div class="calc" id="vCalc"></div>
+  <div id="vCompra" hidden style="border:1px solid var(--warn);background:var(--warn-soft);border-radius:8px;padding:12px;display:grid;gap:10px">
+    <div id="vFalta" style="font-size:13.5px;font-weight:600;color:var(--warn)"></div>
+    <label style="display:flex;gap:8px;align-items:center;color:var(--fg);font-size:14px;cursor:pointer"><input id="cBol" type="checkbox" style="width:auto">Comprar do fornecedor no boleto e lançar em Contas a pagar</label>
+    <div id="cBox" class="fields" hidden>
+      <label class="full">Fornecedor<input id="cForn" placeholder="Nome do fornecedor"></label>
+      <label>Quantidade comprada<input id="cQtd" type="number" min="1"></label>
+      <label>Valor total da compra (R$)<input id="cVal" type="number" step="0.01" min="0"></label>
+      <label>Parcelas<select id="cPar">${[1,2,3,4,5,6].map(n=>`<option value="${n}">${n}x</option>`).join('')}</select></label>
+      <label>1º vencimento<input id="cVen" type="date" value="${addDias(today(),30)}"></label>
+      <p class="note full" id="cResumo" style="margin:0"></p>
+    </div>
+  </div>`,
+  async()=>{ const p=S.produtos.find(x=>x.id===val('vProd')); const qtd=+val('vQtd'), preco=+val('vPre'), auto=val('vTax')==='';
+    const venda={produto_id:p.id,produto:p.nome,data:val('vData'),pedido:val('vPed').trim()||null,qtd,preco,
+      taxa:auto?Math.round(taxaUnit(preco).total*qtd*100)/100:+val('vTax'),taxa_auto:auto,outros:+val('vOut')||0,custo_unit:+p.custo||0};
+    const compra=!$('vCompra').hidden && $('cBol').checked;
+    if(!compra) return run(sb.from('esys_vendas').insert(venda),'Venda registrada e estoque atualizado');
+    const cq=+val('cQtd')||0, total=+val('cVal')||0, n=+val('cPar')||1, ven=val('cVen');
+    if(cq<1||total<=0||!ven){ toast('Preencha a quantidade, o valor e o vencimento da compra'); return false; }
+    const forn=val('cForn').trim()||null;
+    const parcelas=parcelar(total,n).map((v,i)=>({descricao:`Compra: ${p.nome} (${cq} un.)${venda.pedido?' · pedido '+venda.pedido:''}${n>1?` · parcela ${i+1}/${n}`:''}`,fornecedor:forn,valor:v,vencimento:addDias(ven,30*i)}));
+    let r=await sb.from('esys_boletos').insert(parcelas);
+    if(r.error){ toast(msgErro(r.error)); return false; }
+    r=await sb.from('esys_produtos').update({estoque:(+p.estoque||0)+cq}).eq('id',p.id);
+    if(r.error){ toast(msgErro(r.error)); await carregar(); return false; }
+    return run(sb.from('esys_vendas').insert(venda),`Compra no boleto lançada (${n}x) e venda registrada`); },
   e=>{ const p=S.produtos.find(x=>x.id===val('vProd'));
     if(!e || e.target.id==='vProd') $('vPre').value=p.preco||'';
     const auto=val('vTax')==='', t=taxaUnit(val('vPre'));
     const c=calcVenda({preco:val('vPre'),qtd:val('vQtd'),taxa:auto?null:val('vTax'),outros:val('vOut'),custo_unit:p.custo});
     $('vCalc').innerHTML=`<div><span>Faturado</span><span class="num">${BRL(c.bruto)}</span></div><div><span>Taxa Shopee <small>${auto?`(${t.pct}% + ${BRL(t.fixo)} × ${+val('vQtd')||0})`:'(manual)'}</small></span><span class="num">− ${BRL(c.taxa)}</span></div>${c.imp?`<div><span>Imposto</span><span class="num">− ${BRL(c.imp)}</span></div>`:''}<div><span>Custo do produto</span><span class="num">− ${BRL(c.custo)}</span></div><div><span>Frete / embalagem</span><span class="num">− ${BRL(c.outros)}</span></div><div class="tot"><span>Lucro</span><span class="num ${c.lucro<0?'neg':'pos'}">${BRL(c.lucro)}</span></div>`
-      + (+val('vQtd')>(+p.estoque||0)?`<div class="neg" style="font-size:12.5px">Atenção: quantidade maior que o estoque (${+p.estoque||0}).</div>`:'');
+      ;
+    // Sem estoque suficiente: oferecer compra no boleto
+    const est=Math.max(0,+p.estoque||0), falta=(+val('vQtd')||0)-est;
+    $('vCompra').hidden = falta<=0;
+    if(falta>0){
+      $('vFalta').textContent = est? `Estoque insuficiente: há ${est} e faltam ${falta} unidade${falta>1?'s':''}.` : `Sem estoque deste produto: faltam ${falta} unidade${falta>1?'s':''}.`;
+      $('cBox').hidden=!$('cBol').checked;
+      const tid=e&&e.target&&e.target.id;
+      if(tid==='cQtd'||tid==='cVal') $(tid).dataset.edit=1;
+      if(!$('cQtd').dataset.edit) $('cQtd').value=falta;
+      if(!$('cVal').dataset.edit) $('cVal').value=(Math.round((+p.custo||0)*(+val('cQtd')||0)*100)/100).toFixed(2);
+      if(tid==='vProd'){ delete $('cQtd').dataset.edit; delete $('cVal').dataset.edit; $('cQtd').value=falta; $('cVal').value=((+p.custo||0)*falta).toFixed(2); }
+      const ps=parcelar(+val('cVal')||0,+val('cPar')||1);
+      $('cResumo').textContent = val('cVen') ? `${ps.length}x de ${BRL(ps[0])}, a partir de ${fmtD(val('cVen'))}${ps.length>1?', a cada 30 dias':''}. O estoque recebe ${+val('cQtd')||0} un. e a venda baixa ${+val('vQtd')||0}.` : '';
+    }
   });
 }
 function formProd(id){

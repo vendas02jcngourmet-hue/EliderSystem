@@ -6,7 +6,7 @@ O site é estático (HTML + JavaScript) e os dados ficam no **Supabase**.
 ## O que o sistema faz
 
 - **Painel**: faturamento, lucro líquido, margem, boletos em aberto, valor do estoque, gráfico diário e alertas.
-- **Vendas**: ao lançar um pedido, desconta automaticamente a taxa da Shopee pela faixa de preço, baixa o estoque e calcula o lucro. Excluir a venda devolve os itens ao estoque.
+- **Vendas**: ao lançar um pedido, desconta automaticamente a taxa da Shopee pela faixa de preço, baixa o estoque e calcula o lucro. Excluir a venda devolve os itens ao estoque. Sem estoque suficiente, dá para comprar do fornecedor no boleto (à vista ou parcelado): os boletos entram em Contas a pagar e o estoque é reposto na hora.
 - **Estoque**: produtos com custo, preço, taxa e lucro por unidade, e aviso de estoque mínimo.
 - **Contas a pagar**: boletos com vencimento, alertas de "vence em X dias" e "vencido", e um botão para marcar como pago.
 - **Precificação**: preço sugerido pela margem desejada, preço mínimo, tabela de preços por margem, imposto sobre a venda e aviso quando vender no topo de uma faixa mais barata rende mais.
