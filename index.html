@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ESystemShop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+html,body{margin:0}
+[hidden]{display:none!important}
+img{max-width:100%}
+/* Layout: barra lateral de navegação + área de trabalho; no celular a barra vira abas no topo */
+:root{
+  --bg:#f3f5f4; --surface:#ffffff; --sunk:#e8ecea; --line:#d5dcd9;
+  --fg:#16211e; --muted:#5c6b66; --accent:#0f6b5c; --accent-fg:#ffffff; --accent-soft:#d8ece7;
+  --warm:#c9631d; --good:#1d7a3e; --good-soft:#dcf0e2; --bad:#b3261e; --bad-soft:#f8dedb; --warn:#9a6700; --warn-soft:#f6ecd2;
+  --f-display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1513; --surface:#17201d; --sunk:#1f2a26; --line:#2c3a35;
+  --fg:#e6eeeb; --muted:#93a39d; --accent:#4cc3a8; --accent-fg:#06221c; --accent-soft:#16352e;
+  --warm:#f0914d; --good:#5fd08a; --good-soft:#163323; --bad:#ff8a80; --bad-soft:#3a1c1a; --warn:#e8bb52; --warn-soft:#352b12; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1513; --surface:#17201d; --sunk:#1f2a26; --line:#2c3a35;
+  --fg:#e6eeeb; --muted:#93a39d; --accent:#4cc3a8; --accent-fg:#06221c; --accent-soft:#16352e;
+  --warm:#f0914d; --good:#5fd08a; --good-soft:#163323; --bad:#ff8a80; --bad-soft:#3a1c1a; --warn:#e8bb52; --warn-soft:#352b12; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+nav.side{background:var(--surface);border-right:1px solid var(--line);padding:24px 14px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh}
+.brand{font-family:var(--f-display);font-weight:800;font-size:22px;letter-spacing:-.02em;padding:0 10px 18px}
+.brand span{color:var(--warm)}
+.tab{all:unset;cursor:pointer;padding:10px 12px;border-radius:8px;color:var(--muted);font-weight:500;display:flex;justify-content:space-between;align-items:center}
+.tab:hover{background:var(--sunk);color:var(--fg)}
+.tab[aria-selected="true"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.tab:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.badge{font-family:var(--f-mono);font-size:11px;background:var(--bad);color:#fff;border-radius:99px;padding:1px 7px}
+.sync{margin-top:auto;font-size:12px;color:var(--muted);padding:0 10px}
+main{padding-block:28px 60px;padding-left:max(28px,env(safe-area-inset-left,0px));padding-right:max(28px,env(safe-area-inset-right,0px));min-width:0;max-width:1180px;width:100%}
+h1{font-family:var(--f-display);font-weight:800;font-size:30px;letter-spacing:-.02em;margin:0;text-wrap:balance}
+.head{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between;margin-bottom:22px}
+.sub{color:var(--muted);margin:2px 0 0}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:22px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px}
+.kpi .lb{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.kpi .v{font-family:var(--f-mono);font-size:24px;margin-top:4px;font-variant-numeric:tabular-nums}
+.kpi .d{font-size:12.5px;color:var(--muted);margin-top:2px}
+.pos{color:var(--good)} .neg{color:var(--bad)}
+.grid2{display:grid;grid-template-columns:1.5fr 1fr;gap:16px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;min-width:0}
+.panel h2{font-family:var(--f-display);font-weight:600;font-size:17px;margin:0 0 12px}
+.chart{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font-family:var(--f-mono);font-size:10px}
+.alert{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+.alert:last-child{border-bottom:0}
+.pill{font-size:11.5px;font-weight:600;border-radius:99px;padding:2px 9px;white-space:nowrap}
+.p-bad{background:var(--bad-soft);color:var(--bad)} .p-warn{background:var(--warn-soft);color:var(--warn)} .p-good{background:var(--good-soft);color:var(--good)} .p-neu{background:var(--sunk);color:var(--muted)}
+.btn{all:unset;cursor:pointer;background:var(--accent);color:var(--accent-fg);font-weight:600;padding:9px 16px;border-radius:8px;font-size:14px}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--line)}
+.lnk{all:unset;cursor:pointer;color:var(--muted);font-size:13px;padding:4px 6px;border-radius:6px}
+.lnk:hover{color:var(--fg);background:var(--sunk)}
+.lnk.del:hover{color:var(--bad)}
+.tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:640px}
+th{text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--sunk)}
+td{padding:11px 14px;border-bottom:1px solid var(--line)}
+tr:last-child td{border-bottom:0}
+td.r,th.r{text-align:right}
+.empty{padding:36px 20px;text-align:center;color:var(--muted)}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.chip{all:unset;cursor:pointer;font-size:13px;padding:5px 12px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+dialog{border:0;border-radius:12px;padding:0;background:var(--surface);color:var(--fg);width:min(520px,calc(100vw - 32px));box-shadow:0 20px 60px rgba(0,0,0,.25)}
+dialog::backdrop{background:rgba(10,20,17,.45)}
+dialog form{padding:22px;display:grid;gap:14px}
+dialog h3{font-family:var(--f-display);font-size:20px;margin:0}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fields .full{grid-column:1/-1}
+label{display:grid;gap:5px;font-size:13px;color:var(--muted);font-weight:500}
+input,select{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 11px;width:100%}
+.calc{background:var(--sunk);border-radius:8px;padding:12px;font-size:13.5px;display:grid;gap:3px}
+.calc div{display:flex;justify-content:space-between}
+.calc .tot{font-weight:600;border-top:1px solid var(--line);padding-top:6px;margin-top:3px}
+.actions{display:flex;gap:10px;justify-content:flex-end}
+.note{font-size:12.5px;color:var(--muted)}
+.toast{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 18px;border-radius:8px;font-size:14px;z-index:20}
+.stockbar{height:6px;background:var(--sunk);border-radius:3px;overflow:hidden;width:80px;display:inline-block;vertical-align:middle;margin-left:8px}
+.stockbar i{display:block;height:100%}
+@media (max-width:860px){
+  .app{grid-template-columns:1fr}
+  nav.side{position:sticky;top:env(safe-area-inset-top,0px);height:auto;flex-direction:row;overflow-x:auto;padding:10px max(12px,env(safe-area-inset-left,0px));border-right:0;border-bottom:1px solid var(--line);z-index:5;gap:2px}
+  body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+  .brand{padding:8px 10px 8px 4px;font-size:18px}
+  .tab{white-space:nowrap;gap:6px}
+  .sync{display:none}
+  main{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 60px}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid2{grid-template-columns:1fr}
+}
+@media (max-width:420px){.fields{grid-template-columns:1fr}.kpi .v{font-size:20px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<style>
+.login{min-height:100vh;display:grid;place-items:center;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.login form{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:28px;width:min(380px,100%);display:grid;gap:14px}
+.login .brand{padding:0;font-size:28px}
+.err{color:var(--bad);font-size:13.5px;margin:0}
+.who{font-size:12px;color:var(--muted);padding:0 10px;word-break:break-all}
+</style>
+</head>
+<body>
+
+<div class="login" id="loginView" hidden>
+  <form id="loginForm">
+    <div class="brand">ESystem<span>Shop</span></div>
+    <p class="sub" style="margin:-8px 0 4px">Entre com o usuário criado no Supabase</p>
+    <label>E-mail<input id="lEmail" type="email" autocomplete="username" required></label>
+    <label>Senha<input id="lPass" type="password" autocomplete="current-password" required></label>
+    <p class="err" id="lErr" hidden></p>
+    <button class="btn" type="submit" id="lBtn" style="text-align:center">Entrar</button>
+  </form>
+</div>
+
+<div class="login" id="setupView" hidden>
+  <div class="panel" style="max-width:480px">
+    <div class="brand" style="padding:0 0 10px">ESystem<span>Shop</span></div>
+    <h2>Falta configurar o Supabase</h2>
+    <p>Abra o arquivo <b>config.js</b> e preencha a <b>Project URL</b> e a chave <b>anon public</b> do seu projeto. O passo a passo está no README do repositório.</p>
+  </div>
+</div>
+
+<div class="app" id="appView" hidden>
+  <nav class="side" role="tablist" aria-label="Seções">
+    <div class="brand">ESystem<span>Shop</span></div>
+    <button class="tab" role="tab" data-view="painel" aria-selected="true">Painel</button>
+    <button class="tab" role="tab" data-view="vendas">Vendas</button>
+    <button class="tab" role="tab" data-view="estoque">Estoque <span class="badge" id="bEst" hidden></span></button>
+    <button class="tab" role="tab" data-view="contas">Contas a pagar <span class="badge" id="bCon" hidden></span></button>
+    <button class="tab" role="tab" data-view="config">Taxas</button>
+    <div class="sync" id="sync">Conectando…</div>
+    <div class="who" id="who"></div>
+    <button class="tab" id="logout" style="font-size:13px">Sair</button>
+  </nav>
+  <main id="main"></main>
+</div>
+
+<dialog id="dlg"><form id="frm" method="dialog"></form></dialog>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script>
+const BRL = v => (+v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const fmtD = s => s ? s.split('-').reverse().join('/') : '—';
+const today = () => { const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
+const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const daysTo = s => Math.round((new Date(s+'T12:00')-new Date(today()+'T12:00'))/864e5);
+const $ = id => document.getElementById(id);
+
+const FAIXAS_PADRAO = [
+  {ate:79.99, pct:20, fixo:4.5},
+  {ate:99.99, pct:14, fixo:16},
+  {ate:199.99, pct:14, fixo:20},
+  {ate:499.99, pct:14, fixo:26},
+  {ate:null, pct:14, fixo:26}
+];
+const S = { produtos:[], vendas:[], boletos:[], config:{faixas:FAIXAS_PADRAO, meio_abaixo:9}, view:'painel', filtro:'abertos', periodo:30 };
+const faixas = () => (Array.isArray(S.config.faixas)&&S.config.faixas.length) ? S.config.faixas : FAIXAS_PADRAO;
+function taxaUnit(preco){
+  preco=+preco||0;
+  const f=faixas().find(x=>x.ate==null||preco<=+x.ate)||faixas()[faixas().length-1];
+  const fixo = preco<(+S.config.meio_abaixo||0) ? preco/2 : +f.fixo;
+  return {pct:+f.pct, fixo, total:preco*(+f.pct)/100+fixo};
+}
+
+// ---------- Supabase ----------
+const cfg = window.ESYS_CONFIG||{};
+let sb = null, user = null;
+
+async function boot(){
+  if(!cfg.url || !cfg.anonKey || !window.supabase){ $('setupView').hidden=false; return; }
+  sb = window.supabase.createClient(cfg.url, cfg.anonKey);
+  const { data:{ session } } = await sb.auth.getSession();
+  sb.auth.onAuthStateChange((_e, s)=>{ const u=s?.user||null; if((u&&u.id)!==(user&&user.id)){ user=u; showApp(); } });
+  user = session?.user || null;
+  showApp();
+}
+function showApp(){
+  $('loginView').hidden = !!user; $('appView').hidden = !user;
+  if(user){ $('who').textContent=user.email||''; carregar(); }
+}
+async function carregar(){
+  setSync('Carregando…');
+  const [p,v,b,a] = await Promise.all([
+    sb.from('produtos').select('*').order('nome'),
+    sb.from('vendas').select('*').order('data',{ascending:false}).limit(5000),
+    sb.from('boletos').select('*').order('vencimento'),
+    sb.from('ajustes').select('*').maybeSingle()
+  ]);
+  const err = p.error||v.error||b.error||a.error;
+  if(err){ setSync('Erro ao carregar'); toast(msgErro(err)); return; }
+  S.produtos=p.data; S.vendas=v.data; S.boletos=b.data;
+  if(a.data) S.config=a.data;
+  setSync('Salvo no Supabase · '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
+  render();
+}
+function msgErro(e){
+  const m=(e&&(e.message||e.error_description))||'';
+  if(/duplicate key|vendas_pedido_unico/i.test(m)) return 'Esse pedido já foi lançado para esse produto.';
+  if(/JWT|session|auth/i.test(m)) return 'Sua sessão expirou. Entre de novo.';
+  if(/relation .* does not exist/i.test(m)) return 'Tabelas não encontradas. Rode o supabase/schema.sql no SQL Editor.';
+  return 'Não foi possível salvar: '+m;
+}
+async function run(q, ok){
+  const { error } = await q;
+  if(error){ toast(msgErro(error)); return false; }
+  if(ok) toast(ok);
+  await carregar();
+  return true;
+}
+
+$('loginForm').onsubmit = async e => {
+  e.preventDefault(); $('lErr').hidden=true; $('lBtn').textContent='Entrando…';
+  const { error } = await sb.auth.signInWithPassword({ email:$('lEmail').value.trim(), password:$('lPass').value });
+  $('lBtn').textContent='Entrar';
+  if(error){ $('lErr').textContent = /invalid/i.test(error.message)?'E-mail ou senha incorretos.':error.message; $('lErr').hidden=false; }
+};
+$('logout').onclick = async () => { await sb.auth.signOut(); user=null; S.produtos=[];S.vendas=[];S.boletos=[]; showApp(); };
+
+function setSync(t){ $('sync').textContent=t; }
+function toast(t){ const el=$('toast'); el.textContent=t; el.hidden=false; clearTimeout(toast.t); toast.t=setTimeout(()=>el.hidden=true,2600); }
+
+// ---------- Cálculos ----------
+function calcVenda(v){
+  const qtd=+v.qtd||0, bruto=(+v.preco||0)*qtd;
+  const taxa=v.taxa!=null&&v.taxa!==''?+v.taxa:taxaUnit(v.preco).total*qtd;
+  const custo=(+v.custo_unit||0)*qtd, outros=+v.outros||0;
+  return {bruto,taxa,custo,outros,lucro:bruto-taxa-custo-outros};
+}
+const inPeriod=(d,n)=>daysTo(d)<=0&&daysTo(d)>-n;
+function boletoStatus(b){ if(b.pago) return ['Pago','p-good']; const n=daysTo(b.vencimento); if(n<0) return [`Vencido há ${-n}d`,'p-bad']; if(n===0) return ['Vence hoje','p-bad']; if(n<=7) return [`Vence em ${n}d`,'p-warn']; return [`Em ${n} dias`,'p-neu']; }
+
+// ---------- Telas ----------
+function render(){
+  document.querySelectorAll('.tab[data-view]').forEach(t=>t.setAttribute('aria-selected',t.dataset.view===S.view));
+  const baixo=S.produtos.filter(p=>(+p.estoque||0)<=(+p.minimo||0)).length;
+  const urg=S.boletos.filter(b=>!b.pago&&daysTo(b.vencimento)<=3).length;
+  $('bEst').hidden=!baixo; $('bEst').textContent=baixo; $('bCon').hidden=!urg; $('bCon').textContent=urg;
+  $('main').innerHTML = ({painel,vendas,estoque,contas,config})[S.view]();
+  bind();
+}
+
+function painel(){
+  const n=S.periodo, vs=S.vendas.filter(v=>inPeriod(v.data,n));
+  const t=vs.reduce((a,v)=>{const c=calcVenda(v);a.bruto+=c.bruto;a.lucro+=c.lucro;a.taxa+=c.taxa;a.qtd+=+v.qtd||0;return a},{bruto:0,lucro:0,taxa:0,qtd:0});
+  const margem=t.bruto?t.lucro/t.bruto*100:0;
+  const aberto=S.boletos.filter(b=>!b.pago), totAberto=aberto.reduce((a,b)=>a+(+b.valor||0),0);
+  const valEst=S.produtos.reduce((a,p)=>a+(+p.custo||0)*Math.max(0,+p.estoque||0),0);
+  const alerts=[];
+  aberto.filter(b=>daysTo(b.vencimento)<=7).forEach(b=>{const [l,c]=boletoStatus(b);alerts.push(`<div class="alert"><span>${esc(b.descricao)} · <span class="num">${BRL(b.valor)}</span></span><span class="pill ${c}">${l}</span></div>`)});
+  S.produtos.filter(p=>(+p.estoque||0)<=(+p.minimo||0)).forEach(p=>alerts.push(`<div class="alert"><span>${esc(p.nome)}</span><span class="pill ${+p.estoque<=0?'p-bad':'p-warn'}">${+p.estoque<=0?'Sem estoque':'Restam '+p.estoque}</span></div>`));
+  const top={}; vs.forEach(v=>{top[v.produto]=(top[v.produto]||0)+calcVenda(v).lucro});
+  const topL=Object.entries(top).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  return `<div class="head"><div><h1>Painel</h1><p class="sub">Resumo dos últimos ${n} dias</p></div>
+    <div class="filters" style="margin:0">${[7,30,90].map(d=>`<button class="chip" data-per="${d}" aria-pressed="${d===n}">${d} dias</button>`).join('')}</div></div>
+  <div class="kpis">
+    <div class="kpi"><div class="lb">Faturamento</div><div class="v">${BRL(t.bruto)}</div><div class="d">${vs.length} pedidos · ${t.qtd} itens</div></div>
+    <div class="kpi"><div class="lb">Lucro líquido</div><div class="v ${t.lucro<0?'neg':'pos'}">${BRL(t.lucro)}</div><div class="d">Margem ${margem.toFixed(1).replace('.',',')}% · taxas ${BRL(t.taxa)}</div></div>
+    <div class="kpi"><div class="lb">Contas em aberto</div><div class="v">${BRL(totAberto)}</div><div class="d">${aberto.length} boleto${aberto.length===1?'':'s'}</div></div>
+    <div class="kpi"><div class="lb">Estoque a custo</div><div class="v">${BRL(valEst)}</div><div class="d">${S.produtos.length} produtos</div></div>
+  </div>
+  <div class="grid2">
+    <div class="panel"><h2>Faturamento e lucro por dia</h2>${chart(n)}</div>
+    <div class="panel"><h2>Precisa de atenção</h2>${alerts.length?alerts.join(''):'<p class="note">Nada urgente. Boletos que vencem em até 7 dias e produtos abaixo do mínimo aparecem aqui.</p>'}</div>
+  </div>
+  <div class="panel" style="margin-top:16px"><h2>Produtos que mais deram lucro</h2>${topL.length?topL.map(([p,l])=>`<div class="alert"><span>${esc(p)}</span><span class="num ${l<0?'neg':''}">${BRL(l)}</span></div>`).join(''):'<p class="note">Registre vendas para ver o ranking.</p>'}</div>`;
+}
+function chart(n){
+  const days=[]; for(let i=n-1;i>=0;i--){const d=new Date(today()+'T12:00');d.setDate(d.getDate()-i);days.push(d.toISOString().slice(0,10));}
+  const by=Object.fromEntries(days.map(d=>[d,{b:0,l:0}]));
+  S.vendas.forEach(v=>{if(by[v.data]){const c=calcVenda(v);by[v.data].b+=c.bruto;by[v.data].l+=c.lucro;}});
+  const W=600,H=200,pl=52,pb=22,pt=10;
+  const max=Math.max(10,...days.map(d=>by[d].b));
+  const step=Math.pow(10,Math.floor(Math.log10(max))), top=Math.ceil(max/step)*step;
+  const y=v=>pt+(H-pt-pb)*(1-Math.max(0,v)/top), bw=(W-pl)/n;
+  let g=''; for(let i=0;i<=4;i++){const v=top*i/4;g+=`<line x1="${pl}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${pl-6}" y="${y(v)+3}" text-anchor="end">${v>=1000?(v/1000).toLocaleString('pt-BR')+'k':v}</text>`;}
+  let bars='',pts=[];
+  days.forEach((d,i)=>{const x=pl+i*bw;bars+=`<rect x="${x+bw*.15}" y="${y(by[d].b)}" width="${bw*.7}" height="${H-pb-y(by[d].b)}" fill="var(--accent-soft)"><title>${fmtD(d)}: ${BRL(by[d].b)}</title></rect>`;pts.push(`${x+bw/2},${y(by[d].l)}`);});
+  const lbl=[0,Math.floor(n/2),n-1].map(i=>`<text x="${pl+i*bw+bw/2}" y="${H-6}" text-anchor="middle">${fmtD(days[i]).slice(0,5)}</text>`).join('');
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gráfico de faturamento e lucro">${g}${bars}<polyline points="${pts.join(' ')}" fill="none" stroke="var(--warm)" stroke-width="2"/>${lbl}</svg>
+  <p class="note" style="margin:8px 0 0">Barras: faturamento · Linha laranja: lucro líquido</p>`;
+}
+function vendas(){
+  const rows=S.vendas;
+  return `<div class="head"><div><h1>Vendas</h1><p class="sub">Cada venda baixa o estoque e desconta as taxas da Shopee pela faixa de preço</p></div><button class="btn" data-act="nova-venda">+ Nova venda</button></div>
+  <div class="tablewrap">${rows.length?`<table><thead><tr><th>Data</th><th>Pedido</th><th>Produto</th><th class="r">Qtd</th><th class="r">Faturado</th><th class="r">Taxas</th><th class="r">Custo</th><th class="r">Lucro</th><th></th></tr></thead><tbody>
+  ${rows.map(v=>{const c=calcVenda(v);return `<tr><td class="num">${fmtD(v.data)}</td><td class="num">${esc(v.pedido||'—')}</td><td>${esc(v.produto)}</td><td class="r num">${v.qtd}</td><td class="r num">${BRL(c.bruto)}</td><td class="r num">${BRL(c.taxa+c.outros)}</td><td class="r num">${BRL(c.custo)}</td><td class="r num ${c.lucro<0?'neg':'pos'}">${BRL(c.lucro)}</td><td class="r"><button class="lnk del" data-del="vendas:${v.id}" title="Excluir devolve os itens ao estoque">Excluir</button></td></tr>`}).join('')}
+  </tbody></table>`:'<div class="empty">Nenhuma venda registrada ainda. Clique em <b>Nova venda</b> para lançar o primeiro pedido da Shopee.</div>'}</div>`;
+}
+function estoque(){
+  const rows=S.produtos;
+  return `<div class="head"><div><h1>Estoque</h1><p class="sub">Produtos, custo, preço e quantidade disponível</p></div><button class="btn" data-act="novo-prod">+ Novo produto</button></div>
+  <div class="tablewrap">${rows.length?`<table><thead><tr><th>Produto</th><th>SKU</th><th class="r">Custo</th><th class="r">Preço Shopee</th><th class="r">Taxa/un.</th><th class="r">Lucro/un.</th><th>Estoque</th><th></th></tr></thead><tbody>
+  ${rows.map(p=>{const c=calcVenda({preco:p.preco,qtd:1,custo_unit:p.custo});const e=+p.estoque||0,mi=+p.minimo||0;const pct=Math.max(0,Math.min(100,e/Math.max(1,mi*3)*100));const col=e<=0?'var(--bad)':e<=mi?'var(--warn)':'var(--good)';
+  return `<tr><td>${esc(p.nome)}</td><td class="num">${esc(p.sku||'—')}</td><td class="r num">${BRL(p.custo)}</td><td class="r num">${BRL(p.preco)}</td><td class="r num">${BRL(c.taxa)}</td><td class="r num ${c.lucro<0?'neg':''}">${BRL(c.lucro)}</td><td><span class="num">${e}</span><span class="stockbar"><i style="width:${pct}%;background:${col}"></i></span></td><td class="r" style="white-space:nowrap"><button class="lnk" data-edit="${p.id}">Editar</button><button class="lnk del" data-del="produtos:${p.id}">Excluir</button></td></tr>`}).join('')}
+  </tbody></table>`:'<div class="empty">Cadastre seus produtos com custo e preço de venda para o sistema calcular o lucro de cada pedido.</div>'}</div>`;
+}
+function contas(){
+  const f=S.filtro;
+  let rows=[...S.boletos];
+  if(f==='abertos') rows=rows.filter(b=>!b.pago); if(f==='pagos') rows=rows.filter(b=>b.pago).reverse();
+  const venc=S.boletos.filter(b=>!b.pago&&daysTo(b.vencimento)<0).reduce((a,b)=>a+(+b.valor||0),0);
+  return `<div class="head"><div><h1>Contas a pagar</h1><p class="sub">Boletos de fornecedores, frete, embalagens e despesas fixas${venc?` · <b class="neg">${BRL(venc)} vencidos</b>`:''}</p></div><button class="btn" data-act="novo-bol">+ Novo boleto</button></div>
+  <div class="filters">${[['abertos','Em aberto'],['pagos','Pagos'],['todos','Todos']].map(([k,l])=>`<button class="chip" data-fil="${k}" aria-pressed="${k===f}">${l}</button>`).join('')}</div>
+  <div class="tablewrap">${rows.length?`<table><thead><tr><th>Vencimento</th><th>Descrição</th><th>Fornecedor</th><th class="r">Valor</th><th>Situação</th><th></th></tr></thead><tbody>
+  ${rows.map(b=>{const [l,c]=boletoStatus(b);return `<tr><td class="num">${fmtD(b.vencimento)}</td><td>${esc(b.descricao)}</td><td>${esc(b.fornecedor||'—')}</td><td class="r num">${BRL(b.valor)}</td><td><span class="pill ${c}">${l}</span></td><td class="r" style="white-space:nowrap"><button class="lnk" data-pay="${b.id}">${b.pago?'Desfazer':'Marcar pago'}</button><button class="lnk del" data-del="boletos:${b.id}">Excluir</button></td></tr>`}).join('')}
+  </tbody></table>`:`<div class="empty">${f==='pagos'?'Nenhum boleto pago ainda.':'Nenhum boleto em aberto. Cadastre os boletos para receber alertas de vencimento.'}</div>`}</div>`;
+}
+function config(){
+  const fx=faixas(); let de=0;
+  const linhas=fx.map((f,i)=>{const faixa=f.ate==null?`Acima de ${BRL(de)}`:`${BRL(de)} até ${BRL(f.ate)}`; if(f.ate!=null) de=Math.round((+f.ate+0.01)*100)/100;
+    return `<tr><td>${faixa}</td><td class="r"><input id="fp${i}" type="number" step="0.1" min="0" value="${f.pct}" style="width:90px;text-align:right" aria-label="Comissão %"></td><td class="r"><input id="ff${i}" type="number" step="0.01" min="0" value="${f.fixo}" style="width:100px;text-align:right" aria-label="Taxa fixa R$"></td></tr>`}).join('');
+  return `<div class="head"><div><h1>Taxas da Shopee</h1><p class="sub">Vendedor CNPJ · comissão, transação e Frete Grátis já incluídos · cobradas por unidade</p></div></div>
+  <div class="panel" style="max-width:600px"><form id="cfg" style="display:grid;gap:14px">
+    <div class="tablewrap" style="border:0"><table style="min-width:420px"><thead><tr><th>Preço do item</th><th class="r">Comissão %</th><th class="r">Fixa por item</th></tr></thead><tbody>${linhas}</tbody></table></div>
+    <label style="max-width:300px">Itens abaixo de (R$) pagam fixa = metade do preço<input id="cMeio" type="number" step="0.01" min="0" value="${S.config.meio_abaixo??9}"></label>
+    <p class="note" style="margin:0">Toda venda lançada desconta essas taxas automaticamente, item por item. O valor fica gravado na venda, então mudar as taxas aqui não altera vendas antigas. Para um pedido com taxa diferente, digite o valor exato do extrato ao lançar.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" type="submit">Salvar taxas</button><button class="btn ghost" type="button" id="cReset">Voltar ao padrão 2026</button></div>
+  </form></div>`;
+}
+
+// ---------- Formulários ----------
+const dlg=$('dlg'), frm=$('frm');
+function openForm(html,onSubmit,onInput){
+  frm.innerHTML=html+`<div class="actions"><button type="button" class="btn ghost" id="fCancel">Cancelar</button><button class="btn" type="submit" id="fOk">Salvar</button></div>`;
+  frm.onsubmit=async e=>{e.preventDefault(); if(!frm.reportValidity()) return; $('fOk').textContent='Salvando…'; if(await onSubmit()!==false) dlg.close(); else $('fOk').textContent='Salvar';};
+  frm.oninput=onInput||null; $('fCancel').onclick=()=>dlg.close();
+  dlg.showModal(); if(onInput) onInput();
+}
+const val=id=>$(id).value;
+const num=id=>val(id)===''?null:+val(id);
+function formVenda(){
+  if(!S.produtos.length){ toast('Cadastre um produto no Estoque antes de lançar vendas'); S.view='estoque'; render(); return; }
+  openForm(`<h3>Nova venda</h3><div class="fields">
+    <label class="full">Produto<select id="vProd">${S.produtos.map(p=>`<option value="${p.id}">${esc(p.nome)} (${+p.estoque||0} em estoque)</option>`).join('')}</select></label>
+    <label>Data<input id="vData" type="date" value="${today()}" required></label>
+    <label>Nº do pedido<input id="vPed" placeholder="Opcional"></label>
+    <label>Quantidade<input id="vQtd" type="number" min="1" value="1" required></label>
+    <label>Preço unitário (R$)<input id="vPre" type="number" step="0.01" min="0" required></label>
+    <label>Taxa Shopee (R$)<input id="vTax" type="number" step="0.01" min="0" placeholder="Automática pela faixa"></label>
+    <label>Frete / embalagem (R$)<input id="vOut" type="number" step="0.01" min="0" value="0"></label>
+  </div><div class="calc" id="vCalc"></div>`,
+  ()=>{ const p=S.produtos.find(x=>x.id===val('vProd')); const qtd=+val('vQtd'), preco=+val('vPre'), auto=val('vTax')==='';
+    return run(sb.from('vendas').insert({produto_id:p.id,produto:p.nome,data:val('vData'),pedido:val('vPed').trim()||null,qtd,preco,
+      taxa:auto?Math.round(taxaUnit(preco).total*qtd*100)/100:+val('vTax'),taxa_auto:auto,outros:+val('vOut')||0,custo_unit:+p.custo||0}),'Venda registrada e estoque atualizado'); },
+  e=>{ const p=S.produtos.find(x=>x.id===val('vProd'));
+    if(!e || e.target.id==='vProd') $('vPre').value=p.preco||'';
+    const auto=val('vTax')==='', t=taxaUnit(val('vPre'));
+    const c=calcVenda({preco:val('vPre'),qtd:val('vQtd'),taxa:auto?null:val('vTax'),outros:val('vOut'),custo_unit:p.custo});
+    $('vCalc').innerHTML=`<div><span>Faturado</span><span class="num">${BRL(c.bruto)}</span></div><div><span>Taxa Shopee <small>${auto?`(${t.pct}% + ${BRL(t.fixo)} × ${+val('vQtd')||0})`:'(manual)'}</small></span><span class="num">− ${BRL(c.taxa)}</span></div><div><span>Custo do produto</span><span class="num">− ${BRL(c.custo)}</span></div><div><span>Frete / embalagem</span><span class="num">− ${BRL(c.outros)}</span></div><div class="tot"><span>Lucro</span><span class="num ${c.lucro<0?'neg':'pos'}">${BRL(c.lucro)}</span></div>`
+      + (+val('vQtd')>(+p.estoque||0)?`<div class="neg" style="font-size:12.5px">Atenção: quantidade maior que o estoque (${+p.estoque||0}).</div>`:'');
+  });
+}
+function formProd(id){
+  const p=S.produtos.find(x=>x.id===id)||{nome:'',sku:'',custo:'',preco:'',estoque:0,minimo:5};
+  openForm(`<h3>${id?'Editar produto':'Novo produto'}</h3><div class="fields">
+    <label class="full">Nome<input id="pNome" value="${esc(p.nome)}" required></label>
+    <label>SKU<input id="pSku" value="${esc(p.sku)}" placeholder="Opcional"></label>
+    <label>Custo unitário (R$)<input id="pCus" type="number" step="0.01" min="0" value="${p.custo}" required></label>
+    <label>Preço na Shopee (R$)<input id="pPre" type="number" step="0.01" min="0" value="${p.preco}" required></label>
+    <label>Em estoque<input id="pEst" type="number" value="${p.estoque}" required></label>
+    <label>Avisar quando ficar em<input id="pMin" type="number" min="0" value="${p.minimo}"></label>
+  </div>`, ()=>{ const row={nome:val('pNome').trim(),sku:val('pSku').trim()||null,custo:+val('pCus'),preco:+val('pPre'),estoque:+val('pEst'),minimo:+val('pMin')||0};
+    return run(id?sb.from('produtos').update(row).eq('id',id):sb.from('produtos').insert(row), id?'Produto atualizado':'Produto cadastrado'); });
+}
+function formBol(){
+  openForm(`<h3>Novo boleto</h3><div class="fields">
+    <label class="full">Descrição<input id="bDesc" required placeholder="Ex.: Compra de mercadoria"></label>
+    <label>Fornecedor<input id="bForn"></label>
+    <label>Valor (R$)<input id="bVal" type="number" step="0.01" min="0" required></label>
+    <label>Vencimento<input id="bVen" type="date" value="${today()}" required></label>
+  </div>`, ()=>run(sb.from('boletos').insert({descricao:val('bDesc').trim(),fornecedor:val('bForn').trim()||null,valor:+val('bVal'),vencimento:val('bVen')}),'Boleto cadastrado'));
+}
+
+// ---------- Eventos ----------
+document.querySelectorAll('.tab[data-view]').forEach(t=>t.onclick=()=>{S.view=t.dataset.view;render();window.scrollTo(0,0)});
+function bind(){
+  const m=$('main');
+  m.querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>({'nova-venda':formVenda,'novo-prod':()=>formProd(),'novo-bol':formBol})[b.dataset.act]());
+  m.querySelectorAll('[data-per]').forEach(b=>b.onclick=()=>{S.periodo=+b.dataset.per;render()});
+  m.querySelectorAll('[data-fil]').forEach(b=>b.onclick=()=>{S.filtro=b.dataset.fil;render()});
+  m.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>formProd(b.dataset.edit));
+  m.querySelectorAll('[data-pay]').forEach(b=>b.onclick=()=>{const x=S.boletos.find(y=>y.id===b.dataset.pay);run(sb.from('boletos').update({pago:!x.pago,pago_em:x.pago?null:today()}).eq('id',x.id),x.pago?'Boleto reaberto':'Boleto marcado como pago')});
+  m.querySelectorAll('[data-del]').forEach(b=>{b.onclick=()=>{
+    if(b.dataset.armed){const [c,id]=b.dataset.del.split(':');run(sb.from(c).delete().eq('id',id),c==='vendas'?'Venda excluída e itens devolvidos ao estoque':'Excluído');}
+    else{b.dataset.armed=1;b.textContent='Confirmar?';b.style.color='var(--bad)';setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.textContent='Excluir';b.style.color=''}},3000);}
+  }});
+  const f=$('cfg');
+  if(f){
+    const salvar=(fx,meio,ok)=>run(sb.from('ajustes').upsert({user_id:user.id,faixas:fx,meio_abaixo:meio,atualizado_em:new Date().toISOString()}),ok);
+    f.onsubmit=e=>{e.preventDefault();salvar(faixas().map((x,i)=>({ate:x.ate,pct:+val('fp'+i)||0,fixo:+val('ff'+i)||0})),+val('cMeio')||0,'Taxas salvas')};
+    $('cReset').onclick=()=>salvar(FAIXAS_PADRAO,9,'Taxas padrão restauradas');
+  }
+}
+boot();
+</script>
+</body>
+</html>
