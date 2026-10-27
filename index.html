@@ -104,7 +104,9 @@ input,select{font:inherit;color:var(--fg);background:var(--bg);border:1px solid 
   .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
   .grid2{grid-template-columns:1fr}
 }
-@media (max-width:420px){.fields{grid-template-columns:1fr}.kpi .v{font-size:20px}}
+.f4{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:860px){.f4{grid-template-columns:1fr 1fr}}
+@media (max-width:420px){.f4{grid-template-columns:1fr}.fields{grid-template-columns:1fr}.kpi .v{font-size:20px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
@@ -144,6 +146,8 @@ input,select{font:inherit;color:var(--fg);background:var(--bg);border:1px solid 
     <button class="tab" role="tab" data-view="vendas">Vendas</button>
     <button class="tab" role="tab" data-view="estoque">Estoque <span class="badge" id="bEst" hidden></span></button>
     <button class="tab" role="tab" data-view="contas">Contas a pagar <span class="badge" id="bCon" hidden></span></button>
+    <button class="tab" role="tab" data-view="precificacao">Precificação</button>
+    <button class="tab" role="tab" data-view="fotos">Fotos com IA</button>
     <button class="tab" role="tab" data-view="config">Taxas</button>
     <div class="sync" id="sync">Conectando…</div>
     <div class="who" id="who"></div>
@@ -242,8 +246,8 @@ function toast(t){ const el=$('toast'); el.textContent=t; el.hidden=false; clear
 function calcVenda(v){
   const qtd=+v.qtd||0, bruto=(+v.preco||0)*qtd;
   const taxa=v.taxa!=null&&v.taxa!==''?+v.taxa:taxaUnit(v.preco).total*qtd;
-  const custo=(+v.custo_unit||0)*qtd, outros=+v.outros||0;
-  return {bruto,taxa,custo,outros,lucro:bruto-taxa-custo-outros};
+  const custo=(+v.custo_unit||0)*qtd, outros=+v.outros||0, imp=bruto*(+S.config.imposto_pct||0)/100;
+  return {bruto,taxa,custo,outros,imp,lucro:bruto-taxa-imp-custo-outros};
 }
 const inPeriod=(d,n)=>daysTo(d)<=0&&daysTo(d)>-n;
 function boletoStatus(b){ if(b.pago) return ['Pago','p-good']; const n=daysTo(b.vencimento); if(n<0) return [`Vencido há ${-n}d`,'p-bad']; if(n===0) return ['Vence hoje','p-bad']; if(n<=7) return [`Vence em ${n}d`,'p-warn']; return [`Em ${n} dias`,'p-neu']; }
@@ -254,8 +258,8 @@ function render(){
   const baixo=S.produtos.filter(p=>(+p.estoque||0)<=(+p.minimo||0)).length;
   const urg=S.boletos.filter(b=>!b.pago&&daysTo(b.vencimento)<=3).length;
   $('bEst').hidden=!baixo; $('bEst').textContent=baixo; $('bCon').hidden=!urg; $('bCon').textContent=urg;
-  $('main').innerHTML = ({painel,vendas,estoque,contas,config})[S.view]();
-  bind();
+  $('main').innerHTML = ({painel,vendas,estoque,contas,config,precificacao,fotos})[S.view]();
+  bind(); bindCalc(); bindFotos();
 }
 
 function painel(){
@@ -302,7 +306,7 @@ function vendas(){
   const rows=S.vendas;
   return `<div class="head"><div><h1>Vendas</h1><p class="sub">Cada venda baixa o estoque e desconta as taxas da Shopee pela faixa de preço</p></div><button class="btn" data-act="nova-venda">+ Nova venda</button></div>
   <div class="tablewrap">${rows.length?`<table><thead><tr><th>Data</th><th>Pedido</th><th>Produto</th><th class="r">Qtd</th><th class="r">Faturado</th><th class="r">Taxas</th><th class="r">Custo</th><th class="r">Lucro</th><th></th></tr></thead><tbody>
-  ${rows.map(v=>{const c=calcVenda(v);return `<tr><td class="num">${fmtD(v.data)}</td><td class="num">${esc(v.pedido||'—')}</td><td>${esc(v.produto)}</td><td class="r num">${v.qtd}</td><td class="r num">${BRL(c.bruto)}</td><td class="r num">${BRL(c.taxa+c.outros)}</td><td class="r num">${BRL(c.custo)}</td><td class="r num ${c.lucro<0?'neg':'pos'}">${BRL(c.lucro)}</td><td class="r"><button class="lnk del" data-del="vendas:${v.id}" title="Excluir devolve os itens ao estoque">Excluir</button></td></tr>`}).join('')}
+  ${rows.map(v=>{const c=calcVenda(v);return `<tr><td class="num">${fmtD(v.data)}</td><td class="num">${esc(v.pedido||'—')}</td><td>${esc(v.produto)}</td><td class="r num">${v.qtd}</td><td class="r num">${BRL(c.bruto)}</td><td class="r num">${BRL(c.taxa+c.imp+c.outros)}</td><td class="r num">${BRL(c.custo)}</td><td class="r num ${c.lucro<0?'neg':'pos'}">${BRL(c.lucro)}</td><td class="r"><button class="lnk del" data-del="vendas:${v.id}" title="Excluir devolve os itens ao estoque">Excluir</button></td></tr>`}).join('')}
   </tbody></table>`:'<div class="empty">Nenhuma venda registrada ainda. Clique em <b>Nova venda</b> para lançar o primeiro pedido da Shopee.</div>'}</div>`;
 }
 function estoque(){
@@ -365,7 +369,7 @@ function formVenda(){
     if(!e || e.target.id==='vProd') $('vPre').value=p.preco||'';
     const auto=val('vTax')==='', t=taxaUnit(val('vPre'));
     const c=calcVenda({preco:val('vPre'),qtd:val('vQtd'),taxa:auto?null:val('vTax'),outros:val('vOut'),custo_unit:p.custo});
-    $('vCalc').innerHTML=`<div><span>Faturado</span><span class="num">${BRL(c.bruto)}</span></div><div><span>Taxa Shopee <small>${auto?`(${t.pct}% + ${BRL(t.fixo)} × ${+val('vQtd')||0})`:'(manual)'}</small></span><span class="num">− ${BRL(c.taxa)}</span></div><div><span>Custo do produto</span><span class="num">− ${BRL(c.custo)}</span></div><div><span>Frete / embalagem</span><span class="num">− ${BRL(c.outros)}</span></div><div class="tot"><span>Lucro</span><span class="num ${c.lucro<0?'neg':'pos'}">${BRL(c.lucro)}</span></div>`
+    $('vCalc').innerHTML=`<div><span>Faturado</span><span class="num">${BRL(c.bruto)}</span></div><div><span>Taxa Shopee <small>${auto?`(${t.pct}% + ${BRL(t.fixo)} × ${+val('vQtd')||0})`:'(manual)'}</small></span><span class="num">− ${BRL(c.taxa)}</span></div>${c.imp?`<div><span>Imposto</span><span class="num">− ${BRL(c.imp)}</span></div>`:''}<div><span>Custo do produto</span><span class="num">− ${BRL(c.custo)}</span></div><div><span>Frete / embalagem</span><span class="num">− ${BRL(c.outros)}</span></div><div class="tot"><span>Lucro</span><span class="num ${c.lucro<0?'neg':'pos'}">${BRL(c.lucro)}</span></div>`
       + (+val('vQtd')>(+p.estoque||0)?`<div class="neg" style="font-size:12.5px">Atenção: quantidade maior que o estoque (${+p.estoque||0}).</div>`:'');
   });
 }
@@ -410,6 +414,220 @@ function bind(){
     $('cReset').onclick=()=>salvar(FAIXAS_PADRAO,9,'Taxas padrão restauradas');
   }
 }
+// ---------- Precificação ----------
+const impPct = () => (+S.config.imposto_pct||0)/100;
+function lucroEm(P, custoTotal){
+  P=+P||0; const t=taxaUnit(P), imp=P*impPct();
+  return {preco:P, taxa:t.total, pct:t.pct, fixo:t.fixo, imp, custo:custoTotal, lucro:P-t.total-imp-custoTotal, margem:P?(P-t.total-imp-custoTotal)/P:0};
+}
+// Menor preço que entrega a margem pedida (sobre o preço de venda), respeitando as faixas
+function precoPara(m, custoTotal){
+  const imp=impPct(), meio=+S.config.meio_abaixo||0, fx=faixas(); const sols=[];
+  let lo=0;
+  fx.forEach(f=>{
+    const hi=f.ate==null?Infinity:+f.ate, c=(+f.pct)/100;
+    // faixa normal (fixa em R$)
+    const d=1-c-imp-m; if(d>0){ const P=(+f.fixo+custoTotal)/d; if(P>=Math.max(lo,meio)-1e-9 && P<=hi+1e-9) sols.push(P); }
+    // itens abaixo do limite: fixa = metade do preço
+    const d2=1-c-imp-m-0.5; if(d2>0 && lo<meio){ const P=custoTotal/d2; if(P>=lo && P<Math.min(meio,hi)) sols.push(P); }
+    if(f.ate!=null) lo=Math.round((+f.ate+0.01)*100)/100;
+  });
+  return sols.length?Math.ceil(Math.min(...sols)*100)/100:null;
+}
+const pctFmt = x => (x*100).toFixed(1).replace('.',',')+'%';
+function precificacao(){
+  const P=S.calc||(S.calc={prod:'',custo:'',outros:'',margem:+S.config.margem_alvo||20,preco:''});
+  return `<div class="head"><div><h1>Precificação</h1><p class="sub">Descubra quanto cobrar na Shopee e quanto sobra de verdade em cada venda</p></div></div>
+  <div class="grid2">
+    <div class="panel"><h2>Custos do produto</h2>
+      <form id="calcF" class="fields" onsubmit="return false">
+        <label class="full">Produto cadastrado (opcional)<select id="kProd"><option value="">Digitar os valores</option>${S.produtos.map(p=>`<option value="${p.id}" ${p.id===P.prod?'selected':''}>${esc(p.nome)}</option>`).join('')}</select></label>
+        <label>Custo do produto (R$)<input id="kCus" type="number" step="0.01" min="0" value="${P.custo}" placeholder="0,00"></label>
+        <label>Embalagem e outros por unidade (R$)<input id="kOut" type="number" step="0.01" min="0" value="${P.outros}" placeholder="0,00"></label>
+        <label>Imposto sobre a venda (%)<input id="kImp" type="number" step="0.1" min="0" value="${+S.config.imposto_pct||0}"></label>
+        <label>Margem de lucro desejada (%)<input id="kMar" type="number" step="0.5" min="0" max="80" value="${P.margem}"></label>
+        <label class="full">Simular um preço de venda (R$)<input id="kPre" type="number" step="0.01" min="0" value="${P.preco}" placeholder="Em branco = usar o preço sugerido"></label>
+      </form>
+      <p class="note" style="margin:10px 0 0">Margem é o lucro dividido pelo preço de venda. O imposto fica salvo e também entra no lucro das vendas.</p>
+    </div>
+    <div class="panel" id="calcR"></div>
+  </div>
+  <div class="panel" style="margin-top:16px"><h2>Tabela de preços por margem</h2><div class="tablewrap" style="border:0" id="calcT"></div></div>`;
+}
+function calcAtualiza(){
+  if(!$('calcF')) return;
+  const P=S.calc; P.prod=val('kProd'); P.custo=val('kCus'); P.outros=val('kOut'); P.margem=val('kMar'); P.preco=val('kPre');
+  S.config.imposto_pct=+val('kImp')||0;
+  const custoTotal=(+P.custo||0)+(+P.outros||0), m=(+P.margem||0)/100;
+  const sug=precoPara(m,custoTotal), eq=precoPara(0,custoTotal);
+  const preco=P.preco!==''?+P.preco:sug;
+  const r=preco!=null?lucroEm(preco,custoTotal):null;
+  // Dica de faixa: vender no topo de uma faixa mais barata pode render mais
+  let dica='';
+  if(r){ let best=null;
+    faixas().forEach(f=>{ if(f.ate!=null && +f.ate<preco){ const x=lucroEm(+f.ate,custoTotal); if(x.lucro>=r.lucro && (!best||x.lucro>best.lucro)) best=x; } });
+    if(best) dica=`<div class="calc" style="background:var(--warn-soft);color:var(--fg);margin-top:12px"><b>Atenção à faixa de taxa</b><span>Vendendo a <b class="num">${BRL(best.preco)}</b> você lucra <b class="num">${BRL(best.lucro)}</b>, igual ou mais do que a ${BRL(preco)} (${BRL(r.lucro)}), porque a taxa fixa sobe de faixa.</span></div>`;
+  }
+  $('calcR').innerHTML = !custoTotal&&P.preco===''
+    ? `<h2>Resultado</h2><p class="note">Informe o custo do produto para ver o preço sugerido.</p>`
+    : `<h2>Resultado</h2>
+    <div class="kpis" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+      <div class="kpi"><div class="lb">Preço sugerido</div><div class="v">${sug!=null?BRL(sug):'—'}</div><div class="d">para ${String(P.margem||0).replace('.',',')}% de margem</div></div>
+      <div class="kpi"><div class="lb">Preço mínimo</div><div class="v">${eq!=null?BRL(eq):'—'}</div><div class="d">abaixo disso dá prejuízo</div></div>
+    </div>
+    ${sug==null&&P.preco===''?'<p class="neg" style="margin:0">Essa margem não é possível com as taxas atuais. Tente uma margem menor.</p>':''}
+    ${r?`<div class="calc">
+      <div><span>Preço de venda ${P.preco!==''?'(simulado)':'(sugerido)'}</span><span class="num">${BRL(r.preco)}</span></div>
+      <div><span>Taxa Shopee <small>(${r.pct}% + ${BRL(r.fixo)})</small></span><span class="num">− ${BRL(r.taxa)}</span></div>
+      <div><span>Imposto <small>(${String(S.config.imposto_pct||0).replace('.',',')}%)</small></span><span class="num">− ${BRL(r.imp)}</span></div>
+      <div><span>Custo + embalagem</span><span class="num">− ${BRL(r.custo)}</span></div>
+      <div class="tot"><span>Lucro por unidade</span><span class="num ${r.lucro<0?'neg':'pos'}">${BRL(r.lucro)}</span></div>
+      <div><span>Margem real</span><span class="num">${pctFmt(r.margem)}</span></div>
+      <div><span>Markup sobre o custo</span><span class="num">${r.custo?((r.preco/r.custo).toFixed(2).replace('.',','))+'×':'—'}</span></div>
+    </div>`:''}
+    ${dica}
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+      ${P.prod&&r?`<button class="btn" id="kAplica">Usar ${BRL(r.preco)} no produto</button>`:''}
+      <button class="btn ghost" id="kSalva">Salvar imposto e margem padrão</button>
+    </div>`;
+  const ms=[5,10,15,20,25,30,40,50];
+  $('calcT').innerHTML = custoTotal ? `<table style="min-width:520px"><thead><tr><th>Margem</th><th class="r">Preço de venda</th><th class="r">Taxa Shopee</th><th class="r">Imposto</th><th class="r">Lucro/un.</th></tr></thead><tbody>
+    ${ms.map(mm=>{const p=precoPara(mm/100,custoTotal); if(p==null) return `<tr><td>${mm}%</td><td class="r" colspan="4" style="color:var(--muted)">Não alcançável com essas taxas</td></tr>`; const x=lucroEm(p,custoTotal); return `<tr><td>${mm}%</td><td class="r num"><b>${BRL(p)}</b></td><td class="r num">${BRL(x.taxa)}</td><td class="r num">${BRL(x.imp)}</td><td class="r num pos">${BRL(x.lucro)}</td></tr>`}).join('')}
+  </tbody></table>` : '<p class="note">Informe o custo para montar a tabela.</p>';
+  const ap=$('kAplica'); if(ap) ap.onclick=()=>run(sb.from('esys_produtos').update({preco:r.preco}).eq('id',P.prod),'Preço atualizado no produto');
+  $('kSalva').onclick=()=>run(sb.from('esys_ajustes').upsert({user_id:user.id,imposto_pct:+val('kImp')||0,margem_alvo:+val('kMar')||0,atualizado_em:new Date().toISOString()}),'Imposto e margem salvos');
+}
+function bindCalc(){
+  const f=$('calcF'); if(!f) return;
+  f.oninput=e=>{
+    if(e.target.id==='kProd'){ const p=S.produtos.find(x=>x.id===val('kProd')); if(p){ $('kCus').value=p.custo; $('kPre').value=''; } }
+    calcAtualiza();
+  };
+  calcAtualiza();
+}
+
+// ---------- Estúdio de fotos com IA ----------
+S.fotos = [];
+let bgLib = null;
+async function carregaIA(){
+  if(bgLib) return bgLib;
+  const fontes=['https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.8/+esm','https://esm.sh/@imgly/background-removal@1.5.8'];
+  for(const u of fontes){ try{ const m=await import(u); bgLib=m.removeBackground||m.default; if(bgLib) return bgLib; }catch(e){ console.warn('Falha ao carregar',u,e); } }
+  throw new Error('Não foi possível carregar o modelo de IA. Verifique a internet e tente de novo.');
+}
+function fotos(){
+  const o=S.fotoOpt||(S.fotoOpt={tam:1000,margem:12,sombra:true,ajuste:'leve'});
+  return `<div class="head"><div><h1>Fotos com IA</h1><p class="sub">Tira o fundo, aplica fundo branco e acerta luz e cor, sem mudar o produto</p></div></div>
+  <div class="panel" style="margin-bottom:16px">
+    <label for="fFile" id="drop" style="display:grid;place-items:center;gap:6px;border:2px dashed var(--line);border-radius:10px;padding:28px 16px;cursor:pointer;text-align:center;color:var(--muted)">
+      <b style="color:var(--fg);font-size:16px">Escolher fotos dos produtos</b>
+      <span>ou arraste para cá · JPG, PNG ou WEBP · várias de uma vez</span>
+      <input id="fFile" type="file" accept="image/*" multiple hidden>
+    </label>
+    <div class="fields f4" style="margin-top:14px">
+      <label>Tamanho final<select id="oTam"><option value="1000" ${o.tam==1000?'selected':''}>1000 × 1000 (Shopee)</option><option value="1200" ${o.tam==1200?'selected':''}>1200 × 1200</option><option value="2000" ${o.tam==2000?'selected':''}>2000 × 2000</option></select></label>
+      <label>Espaço nas bordas<select id="oMar"><option value="6" ${o.margem==6?'selected':''}>Pouco</option><option value="12" ${o.margem==12?'selected':''}>Médio</option><option value="20" ${o.margem==20?'selected':''}>Bastante</option></select></label>
+      <label>Luz e cor<select id="oAju"><option value="nenhum" ${o.ajuste=='nenhum'?'selected':''}>Sem ajuste</option><option value="leve" ${o.ajuste=='leve'?'selected':''}>Ajuste leve</option><option value="medio" ${o.ajuste=='medio'?'selected':''}>Ajuste médio</option></select></label>
+      <label>Sombra<select id="oSom"><option value="1" ${o.sombra?'selected':''}>Sombra suave</option><option value="0" ${!o.sombra?'selected':''}>Sem sombra</option></select></label>
+    </div>
+    <p class="note" style="margin:10px 0 0">A IA roda no seu navegador: as fotos não são enviadas para nenhum servidor. Na primeira vez ela baixa o modelo (cerca de 40 a 80 MB), depois fica mais rápido. Formas, cores e detalhes do produto não são redesenhados; só o fundo é trocado e a luz é corrigida.</p>
+  </div>
+  ${S.fotos.length?`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px"><h2 style="font-family:var(--f-display);font-size:17px;margin:0">${S.fotos.length} foto${S.fotos.length>1?'s':''}</h2><div style="display:flex;gap:8px">${S.fotos.some(f=>f.out)?'<button class="btn" id="fAll">Baixar todas</button>':''}<button class="btn ghost" id="fClr">Limpar</button></div></div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">${S.fotos.map((f,i)=>`
+    <div class="panel" style="padding:12px;display:grid;gap:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <figure style="margin:0"><img src="${f.src}" alt="Original" style="width:100%;aspect-ratio:1;object-fit:contain;background:var(--sunk);border-radius:6px"><figcaption class="note">Antes</figcaption></figure>
+        <figure style="margin:0">${f.out?`<img src="${f.out}" alt="Resultado" style="width:100%;aspect-ratio:1;object-fit:contain;background:#fff;border-radius:6px;border:1px solid var(--line)">`:`<div style="width:100%;aspect-ratio:1;display:grid;place-items:center;background:var(--sunk);border-radius:6px;font-size:12.5px;color:${f.erro?'var(--bad)':'var(--muted)'};padding:8px;text-align:center">${esc(f.erro||f.status||'Na fila')}</div>`}<figcaption class="note">Depois</figcaption></figure>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="note" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.nome)}</span>${f.out?`<a class="btn" style="padding:6px 12px;font-size:13px" href="${f.out}" download="${esc(f.nome.replace(/\.[^.]+$/,''))}-estudio.jpg">Baixar</a>`:''}</div>
+    </div>`).join('')}</div>`:''}`;
+}
+function bindFotos(){
+  const inp=$('fFile'); if(!inp) return;
+  const opt=()=>{ S.fotoOpt={tam:+val('oTam'),margem:+val('oMar'),ajuste:val('oAju'),sombra:val('oSom')==='1'}; };
+  ['oTam','oMar','oAju','oSom'].forEach(id=>$(id).onchange=()=>{opt();});
+  inp.onchange=()=>{ adicionaFotos(inp.files); inp.value=''; };
+  const d=$('drop');
+  d.ondragover=e=>{e.preventDefault();d.style.borderColor='var(--accent)'};
+  d.ondragleave=()=>d.style.borderColor='';
+  d.ondrop=e=>{e.preventDefault();d.style.borderColor='';adicionaFotos(e.dataTransfer.files)};
+  const c=$('fClr'); if(c) c.onclick=()=>{S.fotos.forEach(f=>{URL.revokeObjectURL(f.src);if(f.out)URL.revokeObjectURL(f.out)});S.fotos=[];render()};
+  const a=$('fAll'); if(a) a.onclick=async()=>{ for(const f of S.fotos.filter(f=>f.out)){ const l=document.createElement('a'); l.href=f.out; l.download=f.nome.replace(/\.[^.]+$/,'')+'-estudio.jpg'; document.body.appendChild(l); l.click(); l.remove(); await new Promise(r=>setTimeout(r,350)); } };
+}
+let filaRodando=false;
+function adicionaFotos(files){
+  [...files].filter(f=>f.type.startsWith('image/')).forEach(f=>S.fotos.push({file:f,nome:f.name,src:URL.createObjectURL(f),status:'Na fila'}));
+  render(); processaFila();
+}
+async function processaFila(){
+  if(filaRodando) return; filaRodando=true;
+  try{
+    for(const f of S.fotos){
+      if(f.out||f.erro||!f.file) continue;
+      const opt={...S.fotoOpt};
+      try{
+        f.status='Carregando a IA…'; atualizaFotos();
+        const remove=await carregaIA();
+        f.status='Recortando o produto…'; atualizaFotos();
+        const recorte=await remove(f.file,{output:{format:'image/png'},progress:(k,c,t)=>{ if(t){ f.status=`Baixando modelo de IA ${Math.round(c/t*100)}%`; atualizaFotos(); } }});
+        f.status='Montando a foto de estúdio…'; atualizaFotos();
+        const blob=await montaEstudio(recorte,opt);
+        f.out=URL.createObjectURL(blob); f.status='';
+      }catch(e){ console.error(e); f.erro=e&&e.message?e.message:'Não foi possível processar esta foto.'; }
+      atualizaFotos();
+    }
+  } finally { filaRodando=false; }
+}
+let _tf=0; function atualizaFotos(){ if(S.view!=='fotos') return; cancelAnimationFrame(_tf); _tf=requestAnimationFrame(render); }
+
+async function montaEstudio(pngBlob,opt){
+  const img=await createImageBitmap(pngBlob);
+  // 1) achar a área do produto pelo canal alfa
+  const w=img.width,h=img.height, c0=new OffscreenCanvas(w,h), x0=c0.getContext('2d',{willReadFrequently:true});
+  x0.drawImage(img,0,0); const id=x0.getImageData(0,0,w,h), d=id.data;
+  let minX=w,minY=h,maxX=-1,maxY=-1;
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){ if(d[(y*w+x)*4+3]>12){ if(x<minX)minX=x; if(x>maxX)maxX=x; if(y<minY)minY=y; if(y>maxY)maxY=y; } }
+  if(maxX<0) throw new Error('A IA não encontrou o produto nesta foto. Tente uma foto com o produto mais visível.');
+  // 2) ajuste suave de luz e cor (níveis por canal, sem redesenhar nada)
+  if(opt.ajuste!=='nenhum'){
+    const forca=opt.ajuste==='medio'?0.85:0.5;
+    const hist=[new Uint32Array(256),new Uint32Array(256),new Uint32Array(256)]; let n=0;
+    for(let i=0;i<d.length;i+=4){ if(d[i+3]>200){ hist[0][d[i]]++;hist[1][d[i+1]]++;hist[2][d[i+2]]++; n++; } }
+    if(n>100){
+      const pct=(hh,p)=>{let s=0,t=n*p;for(let v=0;v<256;v++){s+=hh[v];if(s>=t)return v;}return 255;};
+      // mesmo ponto preto/branco para os 3 canais = mais contraste sem mexer na cor do produto
+      const lo=Math.min(pct(hist[0],.005),pct(hist[1],.005),pct(hist[2],.005));
+      const hi=Math.max(pct(hist[0],.995),pct(hist[1],.995),pct(hist[2],.995));
+      const lut=new Uint8ClampedArray(256);
+      for(let v=0;v<256;v++){ let s=hi>lo+20?(v-lo)*255/(hi-lo):v; s=255*Math.pow(Math.min(1,Math.max(0,s/255)),0.95); lut[v]=Math.round(v+(s-v)*forca); }
+      for(let i=0;i<d.length;i+=4){ if(d[i+3]){ d[i]=lut[d[i]]; d[i+1]=lut[d[i+1]]; d[i+2]=lut[d[i+2]]; } }
+      x0.putImageData(id,0,0);
+    }
+  }
+  // 3) compor no fundo branco, centralizado e quadrado
+  const T=opt.tam, pad=T*opt.margem/100, bw=maxX-minX+1, bh=maxY-minY+1;
+  const esc_=Math.min((T-2*pad)/bw,(T-2*pad)/bh), dw=bw*esc_, dh=bh*esc_, dx=(T-dw)/2, dy=(T-dh)/2;
+  const c=new OffscreenCanvas(T,T), x=c.getContext('2d');
+  x.fillStyle='#ffffff'; x.fillRect(0,0,T,T);
+  if(opt.sombra){
+    const rx=dw*0.48, ry=Math.max(6,T*0.03);
+    x.save(); x.translate(T/2,dy+dh-ry*0.25); x.scale(1,ry/rx);
+    const g=x.createRadialGradient(0,0,0,0,0,rx); g.addColorStop(0,'rgba(0,0,0,0.20)'); g.addColorStop(0.6,'rgba(0,0,0,0.07)'); g.addColorStop(1,'rgba(0,0,0,0)');
+    x.fillStyle=g; x.beginPath(); x.arc(0,0,rx,0,Math.PI*2); x.fill(); x.restore();
+  }
+  x.imageSmoothingQuality='high';
+  x.drawImage(c0,minX,minY,bw,bh,dx,dy,dw,dh);
+  // 4) nitidez leve (unsharp mask) só onde há produto
+  if(opt.ajuste!=='nenhum' && 'filter' in x){
+    const amt=opt.ajuste==='medio'?0.35:0.2;
+    const a=x.getImageData(0,0,T,T), b=new OffscreenCanvas(T,T), bx=b.getContext('2d');
+    bx.filter='blur(1px)'; bx.drawImage(c,0,0); const bl=bx.getImageData(0,0,T,T).data, ad=a.data;
+    for(let i=0;i<ad.length;i+=4){ for(let k=0;k<3;k++){ const v=ad[i+k]+(ad[i+k]-bl[i+k])*amt; ad[i+k]=v<0?0:v>255?255:v; } }
+    x.putImageData(a,0,0);
+  }
+  return await c.convertToBlob({type:'image/jpeg',quality:0.92});
+}
+
 boot();
 </script>
 </body>

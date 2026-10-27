@@ -126,3 +126,7 @@ create trigger esys_vendas_estoque
 
 -- Visitantes sem login não acessam nada
 revoke all on public.esys_produtos, public.esys_vendas, public.esys_boletos, public.esys_ajustes from anon;
+
+-- Imposto sobre a venda (ex.: Simples Nacional) e margem padrão da calculadora
+alter table public.esys_ajustes add column if not exists imposto_pct numeric(5,2) not null default 0;
+alter table public.esys_ajustes add column if not exists margem_alvo numeric(5,2) not null default 20;

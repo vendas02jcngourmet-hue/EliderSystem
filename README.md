@@ -9,6 +9,8 @@ O site é estático (HTML + JavaScript) e os dados ficam no **Supabase**.
 - **Vendas**: ao lançar um pedido, desconta automaticamente a taxa da Shopee pela faixa de preço, baixa o estoque e calcula o lucro. Excluir a venda devolve os itens ao estoque.
 - **Estoque**: produtos com custo, preço, taxa e lucro por unidade, e aviso de estoque mínimo.
 - **Contas a pagar**: boletos com vencimento, alertas de "vence em X dias" e "vencido", e um botão para marcar como pago.
+- **Precificação**: preço sugerido pela margem desejada, preço mínimo, tabela de preços por margem, imposto sobre a venda e aviso quando vender no topo de uma faixa mais barata rende mais.
+- **Fotos com IA**: remove o fundo com um modelo de IA que roda no navegador, corrige luz e contraste sem redesenhar o produto, aplica fundo branco quadrado (1000×1000 para a Shopee) e sombra suave. As fotos não são enviadas a nenhum servidor. Usa a biblioteca [@imgly/background-removal](https://github.com/imgly/background-removal-js) (licença AGPL; este repositório é público, o que atende à licença).
 - **Taxas**: faixas da Shopee para vendedor CNPJ (2026), editáveis:
 
 | Preço do item | Comissão | Fixa por item |
